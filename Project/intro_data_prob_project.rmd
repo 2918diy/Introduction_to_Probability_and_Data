@@ -1,0 +1,222 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `brfss2013`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+* * *
+
+## Part 1: Data
+
+**Describe how the observation in the sample are collected, and the implicaiton of this data collection method on the scope of inference (generalizability/causality).**
+
+###### Since 2011, BRFSS conducts both landline telephone- and cellular telephone-based surveys. In conducting the BRFSS landline telephone survey, interviewers collect data from a randomly selected adult in a household. This indicated that random sampling was used. Random assignment wasn't used because the researchers only observed the subjects. 
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+
+Can being a veteran make people thinner?
+
+**Research quesion 2:**
+
+What kinds of vegetables do veterans like most?
+
+**Research quesion 3:**
+
+Do veterans consist of people with high wages and education background?
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button (green button with orange arrow) above. Make sure that your code is visible
+in the project you submit. Delete this note when before you submit your work.
+
+**Research quesion 1:**
+
+This question consists of two variables: "veteran3" and "weight2". First, I need to find the type of these two variables.
+
+```{r}
+str(brfss2013$veteran3)
+str(brfss2013$weight2)
+```
+
+I find that both of them are factor but that's not right. I suppose the type of "weight2" should be numeric. So I need to convert the type from factor to numeric.
+
+```{r}
+brfss2013 <- brfss2013 %>%
+  mutate(wight2_num = as.numeric(as.character(weight2)))
+```
+
+After executing the above code, the type of the "weight2" has been converted to numeric by adding a new variable. "NA" value is used to deal with the blank value in the variable.
+
+```{r}
+str(brfss2013$wight2_num)
+```
+
+Then, I want to draw a box graph to compare the weight of veteran and nonvegetarians.
+**Research quesion 2:**
+
+```{r}
+brfss_q1 <- brfss2013 %>%
+  select(wight2_num,veteran3) %>%
+  filter(!is.na(wight2_num)) %>%
+  filter(!is.na(veteran3))
+
+ggplot(data = brfss_q1,aes(x=veteran3,y=wight2_num)) +
+  geom_boxplot()
+```
+
+According to the graph, I find that there are some incredible outliers in the data set. No one can weight more than 7500 pound. So I need to remove these outliers.
+
+**Research quesion 3:**
+
+```{r}
+brfss_q1 <- brfss_q1 %>%
+  filter(wight2_num<7500)
+```
+
+Then I made the graph again.
+
+```{r}
+ggplot(data = brfss_q1,aes(x=veteran3,y=wight2_num)) +
+  geom_boxplot()
+```
+
+From the graph, I can make a conclusion that being a veteran may not make people thinner. The median weight of veterans is litter higher than the weight of nonveterans.
+
+**Research quesion 2:**
+
+This question consists of four variables: "veteran3", "fvgreen", "fvorang", "fvbeans". First, I need to find the type of these four variables.
+
+```{r}
+str(brfss2013$fvgreen)
+str(brfss2013$fvorang)
+str(brfss2013$fvbeans)
+```
+
+It is good to see that the types of all the variables are exactly what I suppose them to be. Then I want to add a column which records what kinds of vegetable that each veteran eat for most times in a year. At first, I need to make a custom function.
+
+```{r}
+f_fav_veg <- function(df){
+  if (df[1] > df[2]) {
+    if (fvgreen > fvbeans) {
+      return("fvgreen")
+    } else {
+      return("fvbeans")
+    } 
+  }else {
+      if (df[2]>df[3]) {
+        return("fvorang")
+      } else {
+        return("fvbeans")
+      }
+    }
+}
+```
+
+
+```{r}
+brfss2013_q2 <- brfss2013 %>%
+  select(veteran3,fvgreen,fvorang,fvbeans) %>%
+  filter(veteran3=="Yes") %>%
+  filter(!is.na(fvgreen)) %>%
+  filter(!is.na(fvorang)) %>%
+  filter(!is.na(fvbeans)) %>%
+  mutate(fav_veg = apply(brfss2013_q2[2:4],1,f_fav_veg))
+  
+```
+
+By using mutate, apply and a customed function, I was able to add a new column called "fav_veg" to record the type of vegetable a veteran have most in a year, in other words, their favorite vegetables. And then, I want to make a bar graph to show how many people favor green vegetables, orange vegetables or beans.
+
+```{r}
+ggplot(data=brfss2013_q2,aes(x=fav_veg)) +
+  geom_bar()
+```
+
+Conclusion: It seems that green vegetables are the vegetables people love to eat most.
+
+**Research quesion 3:**
+
+This question consists of three variables: "veteran3", "employ1" and "educa". First, I need to find the type of these these variables.
+
+```{r}
+str(brfss2013$employ1)
+str(brfss2013$educa)
+```
+
+So,both of the new variable are factor. Then I select the variable I need and filter the value.
+
+```{r}
+brfss2013_q3 <- brfss2013 %>%
+  select(veteran3,employ1,educa) %>%
+  filter(veteran3=="Yes") %>%
+  filter(!is.na(employ1)) %>%
+  filter(!is.na(educa))
+```
+
+
+```{r}
+brfss2013_q3_g <- brfss2013_q3 %>%
+  mutate(employ1_n=as.numeric(employ1)) %>%
+  mutate(educa_n=as.numeric(educa)) %>%
+  group_by(employ1_n,educa_n) %>%
+  summarise(num = n())
+
+ggplot(brfss2013_q3_g,aes(x=employ1_n,y=educa_n,size=num))+
+  geom_point(shape=21)
+```
+
+Conclusion:
+The graph shows that for people with high education backgroud would like to be veterans.And people with good employment status would like to be veterans. 
+* * *
+
+## Notebook
+
+**Observational Studies & Experiments**
+
+#### Obervational Study
+
++ In an obervational study, researchers collect data in a way that does not directly interfere with how the data arise. In other words, they merely observe.
+
++ Based on observational studies, we can only establish an association.
+
++ If an observational study uses data from the past, it's called a retrospective study. Whereas if data are collected throughout the study, it's called prospective study.
+
+#### Experiments
+
++ In experiments, researchers randomly assign subjects to treatments and then causal connections between the explanatory and response variables can be established.
+
+#### How to make an observational study or experiment
+
++ To make an observational study, we can sample two types of people from the population. Those who choose to work out and those who don't. Then we can find the average energy level for the two groups of people and compare.
+
++ To do an experiment, we sample a group people from the population, then we randomly assign these people into two groups. Those who will regularly work out through the course of the stud and those will not. The difference is that the decision of whether to work out or not is not left up to the subjects as in the observation study, but is instead imposed by the researcher.
